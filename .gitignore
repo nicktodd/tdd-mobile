@@ -45,3 +45,34 @@ build/
 
 # Swift Package Manager metadata
 .swiftpm/
+
+local.properties
+.gradle/
+
+# Android Studio specific files and folders
+.idea/
+.gradle/
+local.properties
+*.iml
+out/
+.cxx/
+.externalNativeBuild/
+.DS_Store
+# Android build folders
+build/
+# Keystore files
+*.jks
+# Android crash logs
+crashlytics-build.properties
+# Android NDK
+obj/
+# Misc
+.cache/
+.project
+.settings/
+.classpath
+# Android Studio navigation editor temp files
+.nav/
+# Android Studio captures
+captures/
+
