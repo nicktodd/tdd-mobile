@@ -19,6 +19,8 @@ import Foundation
  * 3. DEPENDENCY INVERSION: Higher-level modules don't depend on concrete implementations
  * 4. SINGLE RESPONSIBILITY: Separates data access logic from business logic
  */
+
+// MARK: - AutoMockable
 protocol UserRepositoryProtocol {
     /**
      * Retrieves all users from the data source
@@ -84,9 +86,20 @@ class InMemoryUserRepository: UserRepositoryProtocol {
      * - Parameter initialUsers: Optional array of users to populate the repository
      */
     init(initialUsers: [User] = []) {
-        self.users = initialUsers
+        // Copy the users array
+        self.users = []
+        for user in initialUsers {
+            self.users.append(user)
+        }
+        
         // Set nextId to be one higher than the highest existing ID
-        self.nextId = (initialUsers.map { $0.id }.max() ?? 0) + 1
+        var maxId = 0
+        for user in self.users {
+            if user.id > maxId {
+                maxId = user.id
+            }
+        }
+        self.nextId = maxId + 1
     }
     
     // MARK: - UserRepositoryProtocol Implementation
