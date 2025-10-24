@@ -20,6 +20,7 @@ import kotlinx.coroutines.sync.withLock
  * For Testing:
  * - We DON'T use this in ViewModel unit tests (we use mocks instead)
  * - This keeps tests focused on ViewModel behavior, not repository implementation
+ * - For those of you unfamiliar with Kotlin, Unit means void return type.
  */
 class InMemoryUserRepository(initialUsers: List<User> = emptyList()) : UserRepository {
     private val mutex = Mutex()
