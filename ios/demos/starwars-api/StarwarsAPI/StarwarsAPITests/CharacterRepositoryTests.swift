@@ -6,35 +6,29 @@
 //
 
 import XCTest
+import OHHTTPStubs
+import OHHTTPStubsSwift
 @testable import StarwarsAPI
 
 /// Tests for CharacterRepository
 /// These tests demonstrate asynchronous testing patterns and error condition testing
 /// without making actual network calls (we'll use URLProtocol mocking)
 final class CharacterRepositoryTests: XCTestCase {
-    
     var repository: CharacterRepository!
-    var mockURLSession: URLSession!
-    
-    // MARK: - Test Lifecycle
-    
+    var urlSession: URLSession!
+
     override func setUp() {
         super.setUp()
-        
-        // Configure a mock URLSession using URLProtocol
-        // This allows us to intercept network requests and return mock data
         let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [MockURLProtocol.self]
-        mockURLSession = URLSession(configuration: configuration)
-        
-        // Inject the mock session into our repository
-        repository = CharacterRepository(urlSession: mockURLSession)
+    HTTPStubs.removeAllStubs()
+        urlSession = URLSession(configuration: configuration)
+        repository = CharacterRepository(urlSession: urlSession)
     }
-    
+
     override func tearDown() {
         repository = nil
-        mockURLSession = nil
-        MockURLProtocol.reset()
+        urlSession = nil
+    HTTPStubs.removeAllStubs()
         super.tearDown()
     }
     
@@ -50,7 +44,7 @@ final class CharacterRepositoryTests: XCTestCase {
     /// 3. XCTest automatically waits for async operations to complete
     /// 4. No need for XCTestExpectation in modern async/await tests
     func testFetchCharactersSuccess() async throws {
-        // GIVEN: Mock API response with valid character data
+        // GIVEN: Stub API response with valid character data using OHHTTPStubs
         let mockJSON = """
         {
             "count": 2,
@@ -82,23 +76,14 @@ final class CharacterRepositoryTests: XCTestCase {
             ]
         }
         """
-        
         let mockData = mockJSON.data(using: .utf8)!
-        
-        // Configure the mock to return this data
-        MockURLProtocol.mockData = mockData
-        MockURLProtocol.mockResponse = HTTPURLResponse(
-            url: URL(string: "https://swapi.dev/api/people/")!,
-            statusCode: 200,
-            httpVersion: nil,
-            headerFields: nil
-        )
-        
+        stub(condition: isHost("swapi.dev")) { _ in
+            HTTPStubsResponse(data: mockData, statusCode: 200, headers: ["Content-Type": "application/json"])
+        }
+
         // WHEN: We call the async fetchCharacters method
-        // Note: We use 'await' because this is an async function
-        // The test will suspend here until the async operation completes
         let characters = try await repository.fetchCharacters()
-        
+
         // THEN: We should get the expected characters
         XCTAssertEqual(characters.count, 2, "Should return 2 characters")
         XCTAssertEqual(characters[0].name, "Luke Skywalker", "First character should be Luke")
@@ -116,16 +101,17 @@ final class CharacterRepositoryTests: XCTestCase {
     /// 2. We can inspect the thrown error to verify it's the correct type
     /// 3. Network errors are converted to our custom RepositoryError
     func testFetchCharactersNetworkError() async {
-        // GIVEN: A network error scenario
-        MockURLProtocol.mockError = URLError(.notConnectedToInternet)
-        
-        // WHEN/THEN: Calling fetchCharacters should throw a network error
-        // Note: We await inside a closure passed to XCTAssertThrowsError
+        // GIVEN: Stub a network error using OHHTTPStubs
+        stub(condition: isHost("swapi.dev")) { _ in
+            let error = URLError(.notConnectedToInternet)
+            return HTTPStubsResponse(error: error)
+        }
+
+        // WHEN/THEN: Should throw a network error
         await XCTAssertThrowsErrorAsync(
             try await repository.fetchCharacters(),
             "Should throw an error when network fails"
         ) { error in
-            // Verify it's the correct error type
             guard case RepositoryError.networkError = error else {
                 XCTFail("Expected RepositoryError.networkError, got \(error)")
                 return
@@ -142,15 +128,11 @@ final class CharacterRepositoryTests: XCTestCase {
     /// Why this matters: APIs return different status codes for different errors
     /// (404 Not Found, 500 Server Error, etc.) and we need to handle them appropriately
     func testFetchCharactersHTTPError404() async {
-        // GIVEN: A 404 Not Found response
-        MockURLProtocol.mockData = Data() // Empty data
-        MockURLProtocol.mockResponse = HTTPURLResponse(
-            url: URL(string: "https://swapi.dev/api/people/")!,
-            statusCode: 404,
-            httpVersion: nil,
-            headerFields: nil
-        )
-        
+        // GIVEN: Stub a 404 Not Found response
+        stub(condition: isHost("swapi.dev")) { _ in
+            HTTPStubsResponse(data: Data(), statusCode: 404, headers: nil)
+        }
+
         // WHEN/THEN: Should throw an HTTP error
         await XCTAssertThrowsErrorAsync(
             try await repository.fetchCharacters(),
@@ -170,15 +152,11 @@ final class CharacterRepositoryTests: XCTestCase {
     ///
     /// Purpose: Shows how to test different HTTP status codes
     func testFetchCharactersHTTPError500() async {
-        // GIVEN: A 500 server error response
-        MockURLProtocol.mockData = Data()
-        MockURLProtocol.mockResponse = HTTPURLResponse(
-            url: URL(string: "https://swapi.dev/api/people/")!,
-            statusCode: 500,
-            httpVersion: nil,
-            headerFields: nil
-        )
-        
+        // GIVEN: Stub a 500 server error response
+        stub(condition: isHost("swapi.dev")) { _ in
+            HTTPStubsResponse(data: Data(), statusCode: 500, headers: nil)
+        }
+
         // WHEN/THEN: Should throw an HTTP error with status 500
         await XCTAssertThrowsErrorAsync(
             try await repository.fetchCharacters(),
@@ -208,15 +186,10 @@ final class CharacterRepositoryTests: XCTestCase {
             "results": "this should be an array, not a string"
         }
         """
-        
-        MockURLProtocol.mockData = invalidJSON.data(using: .utf8)
-        MockURLProtocol.mockResponse = HTTPURLResponse(
-            url: URL(string: "https://swapi.dev/api/people/")!,
-            statusCode: 200,
-            httpVersion: nil,
-            headerFields: nil
-        )
-        
+        stub(condition: isHost("swapi.dev")) { _ in
+            HTTPStubsResponse(data: invalidJSON.data(using: .utf8)!, statusCode: 200, headers: ["Content-Type": "application/json"])
+        }
+
         // WHEN/THEN: Should throw a decoding error
         await XCTAssertThrowsErrorAsync(
             try await repository.fetchCharacters(),
@@ -237,9 +210,12 @@ final class CharacterRepositoryTests: XCTestCase {
     ///
     /// Note: We simulate a timeout by returning a URLError with .timedOut code
     func testFetchCharactersTimeout() async {
-        // GIVEN: A timeout error
-        MockURLProtocol.mockError = URLError(.timedOut)
-        
+        // GIVEN: Stub a timeout error
+        stub(condition: isHost("swapi.dev")) { _ in
+            let error = URLError(.timedOut)
+            return HTTPStubsResponse(error: error)
+        }
+
         // WHEN/THEN: Should throw a timeout error
         await XCTAssertThrowsErrorAsync(
             try await repository.fetchCharacters(),
@@ -268,80 +244,19 @@ final class CharacterRepositoryTests: XCTestCase {
             "results": []
         }
         """
-        
-        MockURLProtocol.mockData = emptyJSON.data(using: .utf8)
-        MockURLProtocol.mockResponse = HTTPURLResponse(
-            url: URL(string: "https://swapi.dev/api/people/")!,
-            statusCode: 200,
-            httpVersion: nil,
-            headerFields: nil
-        )
-        
+        stub(condition: isHost("swapi.dev")) { _ in
+            HTTPStubsResponse(data: emptyJSON.data(using: .utf8)!, statusCode: 200, headers: ["Content-Type": "application/json"])
+        }
+
         // WHEN: We fetch characters
         let characters = try await repository.fetchCharacters()
-        
+
         // THEN: Should return an empty array (not throw an error)
         XCTAssertTrue(characters.isEmpty, "Should return empty array for no results")
     }
 }
 
-// MARK: - MockURLProtocol
-
-/// Custom URLProtocol for intercepting and mocking network requests
-/// This allows us to test network code without making actual HTTP calls
-class MockURLProtocol: URLProtocol {
-    
-    // Static properties to configure mock responses
-    static var mockData: Data?
-    static var mockResponse: HTTPURLResponse?
-    static var mockError: Error?
-    
-    /// Reset all mock data between tests
-    static func reset() {
-        mockData = nil
-        mockResponse = nil
-        mockError = nil
-    }
-    
-    // MARK: - URLProtocol Override Methods
-    
-    /// Determines if this protocol can handle the request
-    override class func canInit(with request: URLRequest) -> Bool {
-        return true // Handle all requests
-    }
-    
-    /// Returns a canonical version of the request (required override)
-    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
-        return request
-    }
-    
-    /// Starts loading the request with mock data
-    override func startLoading() {
-        // Return error if configured
-        if let error = MockURLProtocol.mockError {
-            client?.urlProtocol(self, didFailWithError: error)
-            return
-        }
-        
-        // Return response if configured
-        if let response = MockURLProtocol.mockResponse {
-            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        }
-        
-        // Return data if configured
-        if let data = MockURLProtocol.mockData {
-            client?.urlProtocol(self, didLoad: data)
-        }
-        
-        // Finish loading
-        client?.urlProtocolDidFinishLoading(self)
-    }
-    
-    /// Stops loading (required override)
-    override func stopLoading() {
-        // Nothing to do
-    }
-}
+// ...existing code...
 
 // MARK: - Async Test Helpers
 
