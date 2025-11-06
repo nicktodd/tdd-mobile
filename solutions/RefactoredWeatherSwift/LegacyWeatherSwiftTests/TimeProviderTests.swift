@@ -54,7 +54,10 @@ class TimeProviderTests: XCTestCase {
         let mockTimeProvider = MockTimeProvider(currentTime: testDate)
         
         // Create WeatherSingleton with controlled time using test-friendly subclass
-        let weatherManager = TestFriendlyWeatherSingleton(timeProvider: mockTimeProvider)
+        let weatherManager = TestFriendlyWeatherSingleton(
+            timeProvider: mockTimeProvider,
+            networkService: SystemNetworkService()
+        )
         
         // ACT: Call the date formatting method
         let formattedDate = weatherManager.getFormattedDate()
@@ -75,7 +78,10 @@ class TimeProviderTests: XCTestCase {
         // ARRANGE: Set up controlled time scenario
         let startTime = Date()
         let mockTimeProvider = MockTimeProvider(currentTime: startTime)
-        let weatherManager = TestFriendlyWeatherSingleton(timeProvider: mockTimeProvider)
+        let weatherManager = TestFriendlyWeatherSingleton(
+            timeProvider: mockTimeProvider,
+            networkService: SystemNetworkService()
+        )
         
         // Simulate caching some data at the start time
         // (This would require additional refactoring of the caching mechanism)

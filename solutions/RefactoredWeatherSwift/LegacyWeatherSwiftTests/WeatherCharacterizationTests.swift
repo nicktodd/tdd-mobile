@@ -251,15 +251,17 @@ class TestableWeatherSingleton: WeatherSingleton {
     var loggedMessages: [String] = []
     private let mockTimeProvider: CharacterizationMockTimeProvider
     
-    // UPDATED: Exercise 2/3 - Always use controllable time provider for characterization tests
-    override init(timeProvider: TimeProvider = CharacterizationMockTimeProvider()) {
+        // UPDATED: Exercise 2/4 - Always use controllable time provider and mock network for characterization tests
+    override init(timeProvider: TimeProvider = CharacterizationMockTimeProvider(), 
+                  networkService: WeatherNetworkService = SystemNetworkService()) {
         // Always use a controllable mock time provider for characterization tests
         if let mockProvider = timeProvider as? CharacterizationMockTimeProvider {
             self.mockTimeProvider = mockProvider
         } else {
             self.mockTimeProvider = CharacterizationMockTimeProvider()
         }
-        super.init(timeProvider: self.mockTimeProvider)
+        
+        super.init(timeProvider: self.mockTimeProvider, networkService: networkService)
     }
     
     // Convenience initializer for tests that need controlled time

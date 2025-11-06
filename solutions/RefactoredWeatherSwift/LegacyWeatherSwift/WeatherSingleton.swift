@@ -39,6 +39,23 @@ class SystemTimeProvider: TimeProvider {
     }
 }
 
+// MARK: - Network Dependency Abstraction (Exercise 4)
+
+// Network dependency abstraction protocol
+// BENEFIT: Allows testing without real network calls
+protocol WeatherNetworkService {
+    func fetchWeatherData(from url: URL) async throws -> Data
+}
+
+// Real implementation using URLSession
+// NOTE: Mock implementations belong in test files, not production code
+class SystemNetworkService: WeatherNetworkService {
+    func fetchWeatherData(from url: URL) async throws -> Data {
+        let (data, _) = try await URLSession.shared.data(from: url)
+        return data
+    }
+}
+
 // MARK: - The God Singleton Anti-Pattern
 class WeatherSingleton: ObservableObject {
     static let shared = WeatherSingleton()
@@ -46,6 +63,10 @@ class WeatherSingleton: ObservableObject {
     // REFACTORED: Time dependency injection (Exercise 2)
     // This allows us to control time in tests, making the class testable
     private let timeProvider: TimeProvider
+    
+    // REFACTORED: Network dependency injection (Exercise 4)
+    // This allows us to test without real network calls
+    private let networkService: WeatherNetworkService
     
     // ANTI-PATTERN: All state mixed together in one place
     @Published var currentWeather: WeatherData?
@@ -67,17 +88,20 @@ class WeatherSingleton: ObservableObject {
     private let defaultCities = ["London", "New York", "Tokyo", "Sydney", "Paris"]
     private var selectedCityIndex = 0
     
-    // REFACTORED: Dependency injection for testability (Exercise 2)
+    // REFACTORED: Dependency injection for testability (Exercise 2 & 4)
     // NOTE: Made internal to allow test subclassing (characterization testing technique)
-    init(timeProvider: TimeProvider = SystemTimeProvider()) {
+    init(timeProvider: TimeProvider = SystemTimeProvider(), 
+         networkService: WeatherNetworkService = SystemNetworkService()) {
         self.timeProvider = timeProvider
+        self.networkService = networkService
         // ANTI-PATTERN: Work in initializer
         loadInitialData()
     }
     
-    // REFACTORED: Factory method for testing with dependency injection
-    static func create(timeProvider: TimeProvider = SystemTimeProvider()) -> WeatherSingleton {
-        return WeatherSingleton(timeProvider: timeProvider)
+    // REFACTORED: Factory method for testing with dependency injection  
+    static func create(timeProvider: TimeProvider = SystemTimeProvider(),
+                      networkService: WeatherNetworkService = SystemNetworkService()) -> WeatherSingleton {
+        return WeatherSingleton(timeProvider: timeProvider, networkService: networkService)
     }
     
     // MARK: - Public Interface (poorly designed)
@@ -173,15 +197,19 @@ class WeatherSingleton: ObservableObject {
         return URL(string: "\(BASE_URL)?q=\(encodedCity)&appid=\(API_KEY)&units=metric")
     }
     
-    // REFACTORED: Exercise 3 - Extracted network request logic  
-    // BENEFIT: Can be overridden in tests to avoid real network calls
+    // REFACTORED: Exercise 4 - Network request with dependency injection & async/await
+    // BENEFIT: Uses injected network service, testable without real network calls
     open func performNetworkRequest(url: URL, city: String) {
-        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
-            DispatchQueue.main.async {
-                self?.isLoading = false
-                self?.handleNetworkResponse(data: data, error: error, city: city)
+        Task { @MainActor in
+            do {
+                let data = try await networkService.fetchWeatherData(from: url)
+                isLoading = false
+                handleNetworkResponse(data: data, error: nil, city: city)
+            } catch {
+                isLoading = false
+                handleNetworkResponse(data: nil, error: error, city: city)
             }
-        }.resume()
+        }
     }
     
     // REFACTORED: Exercise 3 - Extracted response handling logic

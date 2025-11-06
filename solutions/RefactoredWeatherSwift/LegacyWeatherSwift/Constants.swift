@@ -8,8 +8,10 @@
 import Foundation
 
 // ANTI-PATTERN: Random constants mixed together with no logical grouping
-let MYSTERIOUS_CACHE_MULTIPLIER = 1.5 // What does this do? Nobody knows!
-let SOME_ANIMATION_DURATION: Double = 0.42 // Why 0.42? Historical reasons...
+struct LegacyConstants {
+    static let MYSTERIOUS_CACHE_MULTIPLIER = 1.5 // What does this do? Nobody knows!
+    static let SOME_ANIMATION_DURATION: Double = 0.42 // Why 0.42? Historical reasons...
+}
 
 // ANTI-PATTERN: Mixed data types and purposes
 class AppConstants {
@@ -70,9 +72,11 @@ struct WeatherConstants {
     static let WEATHER_ICON_SIZE: CGFloat = 80.0
 }
 
-// ANTI-PATTERN: Global variables pretending to be constants
-var globalDebugMode = true // Should not be mutable global state!
-var currentEnvironment = "production" // Configuration should be elsewhere
+// ANTI-PATTERN: Global variables pretending to be constants (moved to struct)
+struct GlobalState {
+    static var globalDebugMode = true // Should not be mutable global state!
+    static var currentEnvironment = "production" // Configuration should be elsewhere
+}
 
 // ANTI-PATTERN: Computed properties that do work (side effects)
 struct ProblematicConstants {

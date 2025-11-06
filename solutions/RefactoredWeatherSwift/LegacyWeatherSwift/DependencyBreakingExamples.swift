@@ -110,7 +110,7 @@ struct ExampleWeatherData {
     let timestamp: Date
 }
 
-protocol WeatherNetworkService {
+protocol ExampleWeatherNetworkService {
     func fetchWeatherData(for city: String, completion: @escaping (Result<ExampleWeatherData, Error>) -> Void)
 }
 
@@ -129,12 +129,12 @@ protocol Logger {
 // Refactored weather manager with injected dependencies
 class ModularWeatherManager {
     
-    private let networkService: WeatherNetworkService
+    private let networkService: ExampleWeatherNetworkService
     private let cacheService: WeatherCacheService  
     // private let timeProvider: TimeProvider // Moved to WeatherSingleton.swift for Exercise 2
     private let logger: Logger
     
-    init(networkService: WeatherNetworkService,
+    init(networkService: ExampleWeatherNetworkService,
          cacheService: WeatherCacheService,
          // timeProvider: TimeProvider, // Commented out for Exercise 2 - see WeatherSingleton.swift
          logger: Logger) {
@@ -169,7 +169,7 @@ class ModularWeatherManager {
 }
 
 // Mock implementations for testing
-class MockWeatherNetworkService: WeatherNetworkService {
+class MockWeatherNetworkService: ExampleWeatherNetworkService {
     var mockResult: Result<ExampleWeatherData, Error>?
     
     func fetchWeatherData(for city: String, completion: @escaping (Result<ExampleWeatherData, Error>) -> Void) {
@@ -274,8 +274,10 @@ class TestableGlobalWeatherConfig: GlobalWeatherConfig {
 }
 
 // In tests:
-func setupTestConfig() {
-    GlobalWeatherConfig.setInstance(TestableGlobalWeatherConfig())
+struct TestSetupHelpers {
+    static func setupTestConfig() {
+        GlobalWeatherConfig.setInstance(TestableGlobalWeatherConfig())
+    }
 }
 
 // MARK: - Refactoring Progression Examples
