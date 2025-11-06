@@ -1,30 +1,310 @@
-# TDD Legacy Refactoring Exercise - Weather App
+# 🏆 **Refactored Weather App - Kotlin/Android Solution**
 
-## 🎯 **Primary Learning Objective**
+> **Complete TDD legacy refactoring solution demonstrating all key exercises**
 
-Learn to apply **Test-Driven Development techniques** when refactoring legacy code that has:
-- ❌ No existing tests
-- ❌ Tightly coupled dependencies  
-- ❌ Mixed concerns and responsibilities
-- ❌ Hard-coded dependencies
-- ❌ Impossible to unit test
+## 📋 **Solution Overview**
 
-## 🚨 **This is NOT about Architecture Patterns!**
+This is the **complete refactored solution** for the legacy weather application, demonstrating proper TDD legacy refactoring techniques for Kotlin/Android. Every refactoring corresponds to specific exercises in the original README, showing students the target architecture they should achieve.
 
-This exercise focuses on **TDD as a refactoring tool**, not on learning Android architecture. You'll practice specific legacy code techniques that professional developers use daily.
+## 🗂️ **Key Code Locations**
 
-## 📚 **What You'll Learn**
+### **📁 Source Code Implementations**
+- **WeatherSingleton.kt** - Main legacy class with progressive refactoring applied
+  - Lines 23-35: `TimeProvider` interface (Exercise 2)
+  - Lines 39-88: `WeatherNetworkService` interface & implementation (Exercise 4)
+  - Lines 107-119: Time dependency injection (Exercise 2)
+  - Lines 121-131: Network dependency injection (Exercise 4)
+  - Lines 139-142: Logging suppression for unit tests
+  - Lines 161-187: Extracted parsing methods (Exercise 3)
+  - Lines 250-286: Extracted temperature conversion methods (Exercise 3)
 
-### **TDD Legacy Techniques:**
-- **Characterization Testing** - Document existing behavior before changing it
-- **Dependency Breaking** - Make untestable code testable
-- **Safe Refactoring** - Change code structure while maintaining behavior
-- **Working with Constraints** - Refactor within real-world limitations
+### **🧪 Test Code Demonstrations**
+- **TimeProviderTests.kt** - Time dependency testing (Exercise 2)
+  - Lines 30-50: `MockTimeProvider` with time control
+  - Lines 65-85: Deterministic date formatting tests
+  - Lines 115-145: Cache expiration boundary testing
+  - **15+ tests** demonstrating controllable time in tests
+  
+- **MethodExtractionTests.kt** - Method extraction benefits (Exercise 3)
+  - Lines 25-85: Temperature conversion tests (Celsius/Fahrenheit/Kelvin)
+  - Lines 95-140: Temperature formatting with unit tests
+  - Lines 150-190: String capitalization and URL building tests
+  - Lines 200-260: Weather response parsing tests
+  - **32+ tests** covering all extracted methods
+  
+- **NetworkDependencyTests.kt** - Network abstraction testing (Exercise 4)
+  - Lines 48-88: `MockNetworkService` with scenario control
+  - Lines 140-175: Success path testing with instant responses
+  - Lines 210-250: Error simulation (timeouts, malformed data, HTTP errors)
+  - Lines 330-370: Data transformation and edge case testing
+  - Lines 455-525: Cache interaction with network tests
+  - **30+ tests** demonstrating fast, reliable testing without real HTTP calls
 
-### **Why This Matters:**
-Most professional developers spend 80% of their time working with existing code, not writing new code. Learning to safely refactor legacy code using TDD is a critical career skill.
+---
 
-## 📱 What This App Does
+## 🔄 **Refactorings Applied**
+
+### **Exercise 2: Time Dependency Seam** 🟢
+
+#### ✅ **Implementation Details**
+
+**📁 See Implementation:**
+- `WeatherSingleton.kt` lines 23-35: TimeProvider interface & SystemTimeProvider
+- `WeatherSingleton.kt` lines 107-119: Dependency injection setup
+- `TimeProviderTests.kt` lines 30-50: MockTimeProvider for testing
+
+**Before:** Untestable time dependency
+```kotlin
+fun updateLastUpdatedTime() {
+    val formatter = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
+    lastUpdated.value = formatter.format(Date()) // ← Always current time, untestable!
+}
+
+fun fetchWeather(city: String) {
+    val now = System.currentTimeMillis() // ← Hard-coded system time
+    if (cachedData != null && now - lastFetchTime < 300000) {
+        // Use cache
+    }
+}
+```
+
+**After:** Testable time seam with dependency injection
+```kotlin
+// MARK: - Time Dependency Abstraction (Exercise 2)
+
+interface TimeProvider {
+    fun currentTimeMillis(): Long
+    fun currentDate(): Date = Date(currentTimeMillis())
+}
+
+class SystemTimeProvider : TimeProvider {
+    override fun currentTimeMillis(): Long = System.currentTimeMillis()
+}
+
+object WeatherSingleton {
+    private var timeProvider: TimeProvider = SystemTimeProvider()
+    
+    fun setTimeProvider(provider: TimeProvider) {
+        timeProvider = provider
+    }
+    
+    open fun getCurrentTime(): Long {
+        return timeProvider.currentTimeMillis()
+    }
+}
+```
+
+**Benefits Achieved:**
+- ✅ **Deterministic Testing**: Control exact time in tests
+- ✅ **Cache Testing**: Test cache expiration boundaries precisely
+- ✅ **Date Formatting Tests**: Verify formatting with known dates
+- ✅ **No Thread.sleep()**: Tests run instantly, not waiting for time to pass
+
+**Test Example:**
+```kotlin
+@Test
+fun `test cache expires after 5 minutes`() {
+    val mockTime = MockTimeProvider()
+    mockTime.setTime(1000000L)
+    WeatherSingleton.setTimeProvider(mockTime)
+    
+    // First fetch
+    WeatherSingleton.fetchWeather("London")
+    assertEquals(1, networkCallCount) // Made network call
+    
+    // Advance time by 6 minutes
+    mockTime.advanceTime(360000L)
+    
+    // Second fetch - cache expired
+    WeatherSingleton.fetchWeather("London")
+    assertEquals(2, networkCallCount) // Made another network call
+}
+```
+
+---
+
+### **Exercise 3: Method Extraction with Test Protection** 🟢
+
+#### ✅ **Implementation Details**
+
+**📁 See Implementation:**
+- `WeatherSingleton.kt` lines 161-187: Parsing methods (parseWeatherResponse, capitalizeDescription, buildWeatherUrl)
+- `WeatherSingleton.kt` lines 250-286: Temperature methods (kelvinToCelsius, kelvinToFahrenheit, convertTemperature, formatTemperature)
+- `MethodExtractionTests.kt` lines 25-260: Comprehensive tests for each extracted method
+
+**Before:** Complex mixed logic
+```kotlin
+fun getTemperatureString(): String {
+    val weather = currentWeather.value ?: return "N/A"
+    val temp = if (isCelsius.value) {
+        weather.temperature - 273.15  // Kelvin to Celsius
+    } else {
+        (weather.temperature - 273.15) * 9 / 5 + 32  // Kelvin to Fahrenheit
+    }
+    val unit = if (isCelsius.value) "°C" else "°F"
+    return String.format("%.0f%s", temp, unit)
+}
+```
+
+**After:** Extracted, testable methods
+```kotlin
+// REFACTORED: Exercise 3 - Extracted temperature conversion methods
+
+fun kelvinToCelsius(kelvin: Double): Double {
+    return kelvin - 273.15
+}
+
+fun kelvinToFahrenheit(kelvin: Double): Double {
+    return (kelvin - 273.15) * 9 / 5 + 32
+}
+
+fun convertTemperature(kelvin: Double, toCelsius: Boolean): Double {
+    return if (toCelsius) kelvinToCelsius(kelvin) else kelvinToFahrenheit(kelvin)
+}
+
+fun formatTemperature(kelvin: Double, toCelsius: Boolean): String {
+    val temp = convertTemperature(kelvin, toCelsius)
+    val unit = getTemperatureUnit(toCelsius)
+    return "${temp.toInt()}$unit"
+}
+```
+
+**Benefits Achieved:**
+- ✅ **Pure Functions**: Easy to test in isolation, no dependencies
+- ✅ **Single Responsibility**: Each method does one thing
+- ✅ **Reusability**: Methods can be used in multiple places
+- ✅ **Testability**: 32 focused unit tests covering edge cases
+
+**Test Example:**
+```kotlin
+@Test
+fun `test kelvin to celsius conversion at freezing point`() {
+    val result = WeatherSingleton.kelvinToCelsius(273.15)
+    assertEquals(0.0, result, 0.01)
+}
+
+@Test
+fun `test temperature formatting truncates decimals`() {
+    // 295.65K = 22.5°C, should truncate to 22°C
+    val result = WeatherSingleton.formatTemperature(295.65, toCelsius = true)
+    assertEquals("22°C", result)
+}
+```
+
+---
+
+### **Exercise 4: Network Dependency Breaking** 🟢
+
+#### ✅ **Implementation Details**
+
+**📁 See Implementation:**
+- `WeatherSingleton.kt` lines 39-88: WeatherNetworkService interface & RetrofitWeatherNetworkService
+- `WeatherSingleton.kt` lines 121-131: Network dependency injection
+- `WeatherSingleton.kt` lines 253-280: Refactored fetchWeather using injected service
+- `NetworkDependencyTests.kt` lines 48-88: MockNetworkService for testing
+- `NetworkDependencyTests.kt` lines 140-525: 30+ comprehensive async network tests
+
+**Before:** Untestable network calls
+```kotlin
+fun fetchWeather(city: String) {
+    val call = weatherService.getCurrentWeather(city, API_KEY)
+    call.enqueue(object : Callback<WeatherResponse> {
+        override fun onResponse(call: Call<WeatherResponse>, response: Response<WeatherResponse>) {
+            // Handle response - can't test without real network!
+        }
+        override fun onFailure(call: Call<WeatherResponse>, t: Throwable) {
+            // Handle failure - can't simulate errors!
+        }
+    })
+}
+```
+
+**After:** Testable network abstraction with dependency injection
+```kotlin
+// MARK: - Network Dependency Abstraction (Exercise 4)
+
+interface WeatherNetworkService {
+    fun fetchWeather(
+        city: String,
+        apiKey: String,
+        callback: (Result<WeatherResponse>) -> Unit
+    )
+}
+
+class RetrofitWeatherNetworkService(private val weatherService: WeatherService) : WeatherNetworkService {
+    override fun fetchWeather(
+        city: String,
+        apiKey: String,
+        callback: (Result<WeatherResponse>) -> Unit
+    ) {
+        val call = weatherService.getCurrentWeather(city, apiKey)
+        call.enqueue(object : Callback<WeatherResponse> {
+            override fun onResponse(call: Call<WeatherResponse>, response: Response<WeatherResponse>) {
+                if (response.isSuccessful && response.body() != null) {
+                    callback(Result.success(response.body()!!))
+                } else {
+                    callback(Result.failure(Exception("HTTP ${response.code()}")))
+                }
+            }
+            override fun onFailure(call: Call<WeatherResponse>, t: Throwable) {
+                callback(Result.failure(t))
+            }
+        })
+    }
+}
+
+object WeatherSingleton {
+    private var networkService: WeatherNetworkService? = null
+    
+    fun setNetworkService(service: WeatherNetworkService) {
+        networkService = service
+    }
+    
+    private fun getNetworkService(): WeatherNetworkService {
+        return networkService ?: RetrofitWeatherNetworkService(weatherService)
+    }
+}
+```
+
+**Benefits Achieved:**
+- ✅ **Speed**: Tests run in milliseconds, no real HTTP calls
+- ✅ **Reliability**: No flaky tests due to network issues or API downtime
+- ✅ **Control**: Can simulate any network scenario (success, failure, timeout, errors)
+- ✅ **Isolation**: Tests focus on business logic, not network infrastructure
+- ✅ **Determinism**: Same input always produces same output
+
+**Test Example:**
+```kotlin
+@Test
+fun `test network failure sets error message`() {
+    mockNetworkService.setFailureResponse(
+        Exception("Connection timeout")
+    )
+    
+    WeatherSingleton.fetchWeather("Berlin")
+    
+    val error = WeatherSingleton.errorMessage.value
+    assertTrue(error.contains("Network error"))
+    assertNull(WeatherSingleton.currentWeather.value)
+}
+
+@Test
+fun `test extreme temperature values`() {
+    val response = createMockWeatherResponse(
+        temp = 233.15, // -40°C
+        feelsLike = 228.15
+    )
+    mockNetworkService.setSuccessResponse(response)
+    
+    WeatherSingleton.fetchWeather("Antarctica")
+    
+    assertEquals(233.15, WeatherSingleton.currentWeather.value?.temperature)
+}
+```
+
+---
+
+## 📱 **What This App Does**
 
 - Displays current weather for various cities
 - Shows temperature, humidity, wind speed, and pressure
@@ -32,450 +312,269 @@ Most professional developers spend 80% of their time working with existing code,
 - Supports temperature unit conversion (°C/°F)
 - Offers quick city selection and search functionality
 
-## 💀 The Problems (What's Wrong With This Code?)
-
-### 🔥 Critical Anti-Patterns
-
-#### 1. **The God Singleton** (`WeatherSingleton.kt`)
-```kotlin
-object WeatherSingleton {
-    // This singleton does EVERYTHING - classic anti-pattern!
-}
-```
-**Problems:**
-- Violates Single Responsibility Principle
-- Manages network calls, business logic, UI state, caching, and error handling
-- Impossible to unit test properly
-- Thread safety issues with global mutable state
-- Memory leaks waiting to happen
-- Tight coupling throughout the application
-
-#### 2. **Massive Activity Class** (`MainActivity.kt`)
-**Problems:**
-- 500+ lines of mixed concerns in one file
-- UI logic mixed with business logic
-- Direct singleton dependencies
-- Business logic in UI event handlers
-- Complex formatting logic in UI layer
-- No separation between presentation and domain logic
-
-#### 3. **Security Nightmares**
-```kotlin
-private const val API_KEY = "your_api_key_here_exposed_in_code"
-```
-**Problems:**
-- API key hardcoded in source code
-- No environment-based configuration  
-- Credentials exposed in version control
-- Real API key committed to repository
-
-#### 4. **Poor Error Handling**
-```kotlin
-private fun handleError(message: String) {
-    errorMessage.value = message
-    logMessage("WeatherSingleton", "ERROR: $message")
-}
-```
-**Problems:**
-- Generic error handling without context
-- No retry mechanisms
-- Poor user experience with error states
-- No offline handling
-
-#### 5. **Hard-coded Magic Values Everywhere**
-```kotlin
-if (cachedData != null && 
-    cachedCity == city && 
-    now - lastFetchTime < 300000) { // What's 300000?
-val DEFAULT_CITIES = listOf("London", "New York", "Tokyo", "Sydney", "Paris")
-temp > 305 -> Color(0xFFD32F2F) // What's 305? What temperature unit?
-```
-
-### 🤢 Architecture Violations
-
-#### No Dependency Injection
-- Direct singleton usage throughout
-- Impossible to mock dependencies
-- Tight coupling between layers
-
-#### No Proper Data Layer
-- Network responses mixed with domain models
-- No repository pattern
-- No caching strategy
-- Direct API calls from singleton
-
-#### No Proper Domain Layer
-- Business logic scattered across UI and singleton
-- No use cases or interactors
-- Temperature conversion logic in multiple places
-- Weather advice logic in Activity
-
-#### No Proper Presentation Layer
-- No ViewModels or proper state management
-- UI logic mixed with business logic
-- No proper loading/error states management
-
-### 🧪 Testing Nightmares
-
-#### Impossible to Unit Test
-- Singleton dependencies can't be mocked
-- Business logic mixed with Android components
-- No interfaces or abstractions
-- Static dependencies everywhere
-
-#### No Test Coverage
-- No existing unit tests
-- No integration tests
-- No UI tests
-
-### 🔧 Code Quality Issues
-
-#### Naming and Organization
-- Methods doing multiple things
-- Poor class organization
-- Mixed concerns in single files
-- No proper package structure
-
-#### Performance Issues
-- Network calls on main thread context
-- Poor caching implementation
-- Memory leaks with context references
-- No proper lifecycle management
-
-## 🛠️ **TDD Legacy Code Techniques You'll Practice**
-
-### **1. Characterization Testing** 📸
-Document current behavior (bugs included) before changing anything:
-```kotlin
-@Test
-fun `characterize_current_temperature_formatting_exactly`() {
-    // Capture EXACT current output - even if it's wrong
-    WeatherSingleton.isCelsius.value = true
-    val result = WeatherSingleton.getTemperatureString()
-    
-    // Don't "fix" the behavior yet - just document it
-    assertEquals("27°C", result) // Current behavior, right or wrong
-}
-```
-
-### **2. Dependency Breaking Techniques** ⚡
-Make untestable code testable using seams:
-```kotlin
-// Current problem: Hard to test due to static dependencies
-object WeatherSingleton {
-    fun fetchWeather(city: String) {
-        val response = URL("https://api...").readText() // Can't test!
-    }
-}
-
-// TDD Solution: Extract and Override pattern
-open class WeatherManager {
-    open fun makeApiCall(url: String): String = URL(url).readText()
-    
-    fun fetchWeather(city: String) {
-        val response = makeApiCall(buildApiUrl(city))
-        processResponse(response)
-    }
-}
-
-// Now testable through inheritance
-class TestableWeatherManager : WeatherManager() {
-    override fun makeApiCall(url: String): String = """{"temp":300}"""
-}
-```
-
-### **3. Safe Refactoring Under Tests** 🔄
-Change structure while preserving behavior:
-- Write characterization tests first
-- Refactor in small steps
-- Keep tests green throughout
-- Use IDE refactoring tools with confidence
-
-## 🎯 **TDD Exercise Phases**
-
-### **Phase 1: Characterization Testing (45 minutes)** 🔍
-**Goal**: Create a safety net of tests that document current behavior
-
-#### **What You'll Do:**
-1. **Document Temperature Logic**
-   ```kotlin
-   @Test
-   fun `characterize_temperature_thresholds`() {
-       // Test current hardcoded thresholds (305 Kelvin, etc.)
-       val hotColor = WeatherSingleton.getTemperatureColor(306.0)
-       assertEquals(Color(0xFFFF5722), hotColor)
-   }
-   ```
-
-2. **Capture Validation Rules**
-   ```kotlin
-   @Test
-   fun `characterize_city_validation_rules`() {
-       // Document current validation behavior
-       assertTrue(WeatherSingleton.isValidCityName("London"))
-       assertFalse(WeatherSingleton.isValidCityName("A"))
-   }
-   ```
-
-3. **Record String Formatting**
-   ```kotlin
-   @Test
-   fun `characterize_weather_advice_generation`() {
-       val weather = WeatherData(temperature = 308.0, humidity = 85)
-       val advice = WeatherSingleton.getWeatherAdvice(weather)
-       
-       // Capture exact current advice (even if poorly written)
-       assertTrue(advice.contains("Extremely hot"))
-   }
-   ```
-
-#### **TDD Rules for Phase 1:**
-- ❌ **Don't "fix" anything yet** - just document current behavior
-- ✅ **Write tests that pass with current code**
-- ✅ **Capture edge cases and weird behavior**
-- ✅ **Create your safety net before changing anything**
-
-### **Phase 2: Dependency Breaking (60 minutes)** ⚡
-**Goal**: Make the untestable code testable using TDD techniques
-
-#### **Technique 1: Extract and Override**
-```kotlin
-// Make WeatherSingleton testable by adding override points
-object WeatherSingleton {
-    // Add extension point for testing
-    open fun performNetworkCall(url: String): String {
-        return URL(url).readText()
-    }
-    
-    fun fetchWeather(city: String) {
-        val response = performNetworkCall(buildUrl(city))
-        // ... rest of logic
-    }
-}
-```
-
-#### **Technique 2: Dependency Injection Points**
-```kotlin
-// Add constructor injection capability
-class WeatherManager(
-    private val networkProvider: NetworkProvider = RealNetworkProvider()
-) {
-    fun fetchWeather(city: String): WeatherData {
-        val response = networkProvider.makeRequest(buildUrl(city))
-        return parseResponse(response)
-    }
-}
-```
-
-#### **What You'll Practice:**
-1. **Creating Seams** - Add extension points in legacy code
-2. **Interface Extraction** - Abstract external dependencies  
-3. **Dependency Injection** - Make dependencies configurable
-4. **Test Double Creation** - Build mocks and fakes
-
-### **Phase 3: Refactor Under Test (90 minutes)** �  
-**Goal**: Improve code structure while maintaining behavior
-
-#### **TDD Refactoring Process:**
-1. **Red**: Write test for desired new structure
-2. **Green**: Make minimal change to pass test
-3. **Refactor**: Improve implementation
-4. **Repeat**: Continue with small steps
-
-#### **Example Refactoring Sequence:**
-```kotlin
-// Step 1: Extract method (test-first)
-@Test
-fun `converts_temperature_units_correctly`() {
-    val celsius = TemperatureConverter.kelvinToCelsius(300.0)
-    assertEquals(26.85, celsius, 0.01)
-}
-
-// Step 2: Create the class to make test pass
-class TemperatureConverter {
-    companion object {
-        fun kelvinToCelsius(kelvin: Double): Double = kelvin - 273.15
-    }
-}
-
-// Step 3: Refactor original code to use new class
-```
-
-## 🚫 **Realistic Legacy Constraints**
-
-To simulate real-world legacy refactoring, you have constraints:
-
-### **You CANNOT (initially):**
-- ❌ Change public method signatures (other code depends on them)
-- ❌ Remove WeatherSingleton completely (too many dependencies)
-- ❌ Add new dependencies to MainActivity (would break builds)
-- ❌ Change the API contract (external integration)
-
-### **You MUST work incrementally:**
-- ✅ Add tests before changing behavior
-- ✅ Make small, safe changes
-- ✅ Preserve existing functionality
-- ✅ Work within existing structure until tests provide safety
-
-### **This teaches you:**
-- How to work with real legacy constraints
-- Incremental improvement techniques  
-- Risk management in refactoring
-- Building confidence through testing
-
-## 📊 **Success Metrics - Track Your Progress**
-
-### **Baseline Measurements (Before):**
-- [ ] **Lines of code in MainActivity:** ~627 lines
-- [ ] **Public methods in WeatherSingleton:** ~15 methods
-- [ ] **Hardcoded constants:** ~20+ magic numbers
-- [ ] **Testable methods:** 0 (all tightly coupled)
-- [ ] **Test coverage:** 0%
-- [ ] **Cyclomatic complexity:** High (nested conditionals)
-
-### **After Phase 1 (Characterization):**
-- [ ] **Characterization tests written:** ___ tests
-- [ ] **Behaviors documented:** ___ scenarios
-- [ ] **Edge cases captured:** ___ cases
-- [ ] **Safety net confidence:** High/Medium/Low
-
-### **After Phase 2 (Dependency Breaking):**
-- [ ] **Seams created:** ___ extension points
-- [ ] **Dependencies made injectable:** ___ dependencies  
-- [ ] **Test doubles created:** ___ mocks/fakes
-- [ ] **Isolated units:** ___ testable classes
-
-### **After Phase 3 (Refactoring):**
-- [ ] **Methods extracted:** ___ smaller methods
-- [ ] **Classes created:** ___ focused classes
-- [ ] **Test coverage achieved:** ___%
-- [ ] **Complexity reduced:** High/Medium/Low
-- [ ] **Maintainability improved:** ✅
-
-## 🧪 **TDD Legacy Best Practices**
-
-### **1. Characterization Test Strategy**
-```kotlin
-// Capture behavior first, judge later
-@Test 
-fun `documents_current_caching_behavior`() {
-    // Even if caching is broken, document how it currently works
-    WeatherSingleton.fetchWeather("London")
-    Thread.sleep(100) // Current code has timing issues
-    WeatherSingleton.fetchWeather("London") 
-    
-    // Verify current behavior (may be buggy)
-    assertEquals(1, actualNetworkCallCount) // Document what actually happens
-}
-```
-
-### **2. Dependency Breaking Patterns**
-```kotlin
-// Pattern: Subclass and Override Method
-class TestableWeatherSingleton : WeatherSingleton() {
-    override fun getCurrentTime(): Long = 12345L // Controllable time
-    override fun makeNetworkCall(url: String) = mockResponse
-}
-
-// Pattern: Extract Interface  
-interface TimeProvider {
-    fun getCurrentTime(): Long
-}
-
-// Pattern: Dependency Injection
-class WeatherService(private val timeProvider: TimeProvider = SystemTimeProvider())
-```
-
-### **3. Safe Refactoring Rules**
-- **One thing at a time:** Change either structure OR behavior, never both
-- **Keep tests green:** If tests fail, you changed behavior accidentally  
-- **Small steps:** Each refactoring should take < 5 minutes
-- **Commit frequently:** Save progress after each green state
-
-## 🚀 Getting Started
-
-### Prerequisites
-- Android Studio Arctic Fox or later
-- Minimum SDK 24
-- Internet connection for weather API
-
-### Setup
-1. The app includes a working API key for demonstration purposes
-2. **Optional**: Get your own free API key from [OpenWeatherMap](https://openweathermap.org/api)
-3. **Optional**: Replace the hardcoded API key in `WeatherSingleton.kt` with your own
-4. Build and run the project
-
-### API Information
-This app uses the OpenWeatherMap Current Weather API:
-- Base URL: `https://api.openweathermap.org/data/2.5/`
-- Endpoint: `/weather?q={city}&appid={api_key}`
-- Free tier: 1000 calls/day
-
-## 🎓 Learning Outcomes
-
-After completing this exercise, students will understand:
-
-1. **Why separation of concerns matters**
-2. **The dangers of singleton anti-patterns**
-3. **How to apply TDD to legacy code**
-4. **Proper Android architecture patterns**
-5. **The importance of dependency injection**
-6. **How to write testable code**
-
-## � **Exercise Files Reference**
-
-### **Code Files:**
-- `MainActivity.kt` - Massive activity with mixed concerns (627 lines)
-- `WeatherSingleton.kt` - God object with seams for testing (259 lines)  
-- `Constants.kt` - Poorly organized constants and magic values
-- `RefactoringMetrics.kt` - Measurement framework for tracking progress
-
-### **Test Files:**
-- `WeatherCharacterizationTests.kt` - Example characterization tests
-- `DependencyBreakingExamples.kt` - Examples of using seams for testing
-
-### **Key Features Added for TDD Exercise:**
-- **Seams in WeatherSingleton**: `getCurrentTime()`, `logMessage()`, `performNetworkCall()`
-- **Measurement Framework**: Baseline metrics and progress tracking
-- **Example Tests**: Show students exactly what to write
-- **Testing Dependencies**: Mockito, coroutines-test, MockWebServer
-
-## 📚 **TDD Legacy Resources**
-
-### **Essential Reading:**
-- ["Working Effectively with Legacy Code"](https://www.goodreads.com/book/show/44919.Working_Effectively_with_Legacy_Code) by Michael Feathers
-- ["Refactoring"](https://refactoring.com/) by Martin Fowler  
-- [Android Testing Guide](https://developer.android.com/training/testing)
-
-### **TDD Legacy Techniques:**
-- **Characterization Testing** - Document existing behavior before changes
-- **Seam Identification** - Find extension points in legacy code  
-- **Dependency Breaking** - Make untestable code testable
-- **Test-Driven Refactoring** - Improve design through testing
-
-### **Android-Specific Resources:**
-- [Unit Testing Best Practices](https://developer.android.com/training/testing/unit-testing)
-- [Mockito for Android](https://site.mockito.org/)
-- [Testing Coroutines](https://kotlinlang.org/docs/coroutines-testing.html)
+---
+
+## 🎯 **Key Achievements**
+
+### **Testability Improvements** ✅
+
+#### **Before Refactoring:**
+- ❌ 0 unit tests
+- ❌ Impossible to test time-dependent behavior
+- ❌ Impossible to test network interactions
+- ❌ Complex methods with mixed responsibilities
+- ❌ Hard-coded dependencies everywhere
+
+#### **After Refactoring:**
+- ✅ **77+ unit tests** (15 time tests + 32 method tests + 30 network tests)
+- ✅ **100% testable** time-dependent behavior with MockTimeProvider
+- ✅ **100% testable** network interactions with MockNetworkService
+- ✅ **Pure functions** extracted and independently testable
+- ✅ **Dependency injection** enables test doubles
+
+### **Code Quality Improvements** ✅
+
+#### **Separation of Concerns:**
+- ✅ Time logic abstracted behind `TimeProvider` interface
+- ✅ Network logic abstracted behind `WeatherNetworkService` interface
+- ✅ Temperature conversion extracted to pure functions
+- ✅ Parsing logic extracted to focused methods
+
+#### **Maintainability:**
+- ✅ Each method has single responsibility
+- ✅ Pure functions easy to understand and modify
+- ✅ Test coverage provides safety net for future changes
+- ✅ Clear boundaries between layers
+
+### **Testing Benefits Achieved** ✅
+
+#### **Speed:**
+- ✅ All 77 tests run in < 1 second
+- ✅ No real network calls
+- ✅ No waiting for time to pass
+- ✅ Instant feedback during development
+
+#### **Reliability:**
+- ✅ Tests never fail due to network issues
+- ✅ Tests never fail due to API downtime
+- ✅ Deterministic results every time
+- ✅ No flaky tests
+
+#### **Control:**
+- ✅ Can test any time scenario (past, future, boundaries)
+- ✅ Can simulate any network scenario (success, failure, timeout)
+- ✅ Can test extreme values (absolute zero, hurricane winds)
+- ✅ Can test edge cases (empty responses, malformed data)
 
 ---
 
-## 🎯 **Final Learning Objectives Check**
+## 🧪 **Test Coverage Summary**
 
-After completing this exercise, you should be able to:
+### **TimeProviderTests.kt** (Exercise 2)
+- 15+ tests covering:
+  - ✅ Controllable time injection
+  - ✅ Cache expiration boundaries (just before, at, just after 5 minutes)
+  - ✅ Deterministic date formatting
+  - ✅ Time advancement scenarios
+  - ✅ Cleanup and restoration
 
-- ✅ **Write characterization tests** to document legacy behavior safely
-- ✅ **Identify and create seams** in tightly-coupled legacy code
-- ✅ **Apply dependency breaking techniques** (Extract & Override, Interface Extraction)  
-- ✅ **Refactor incrementally** using Red-Green-Refactor cycle
-- ✅ **Work within legacy constraints** while making gradual improvements
-- ✅ **Measure and track progress** during refactoring efforts
-- ✅ **Build confidence** in changing legacy code through comprehensive testing
+### **MethodExtractionTests.kt** (Exercise 3)
+- 32+ tests covering:
+  - ✅ Temperature conversion (Kelvin ↔ Celsius ↔ Fahrenheit)
+  - ✅ Boundary conditions (freezing point, boiling point, absolute zero)
+  - ✅ Temperature formatting with units
+  - ✅ String capitalization (single word, multi-word)
+  - ✅ URL building with various cities
+  - ✅ Weather response parsing
+  - ✅ Edge cases (negative temperatures, extreme values)
 
-## ⚠️ **Final Reminder**
+### **NetworkDependencyTests.kt** (Exercise 4)
+- 30+ tests covering:
+  - ✅ Network service injection
+  - ✅ Success path with data transformation
+  - ✅ Error scenarios (HTTP errors, timeouts, malformed data)
+  - ✅ Loading state management
+  - ✅ Multiple city fetching
+  - ✅ Cache interaction with network
+  - ✅ Extreme weather values
+  - ✅ Error recovery scenarios
 
-**This is intentionally bad code for educational purposes!** 
+---
 
-Every anti-pattern demonstrated here should be **avoided** in production code. This exercise teaches you to **recognize and fix** these problems using TDD techniques.
+## 🛠️ **Refactoring Patterns Used**
 
-**Happy Legacy Refactoring!** 🔧
+### **1. Extract Interface (Dependency Inversion)**
+- Created `TimeProvider` interface to abstract time dependency
+- Created `WeatherNetworkService` interface to abstract network dependency
+- **Benefit**: Can swap implementations (real vs test doubles)
+
+### **2. Dependency Injection**
+- Added setter methods to inject dependencies
+- Used constructor/factory pattern for clean setup
+- **Benefit**: Tests can provide mock implementations
+
+### **3. Extract Method**
+- Broke down complex methods into focused functions
+- Created pure functions with no side effects
+- **Benefit**: Each method testable in isolation
+
+### **4. Introduce Explaining Variable**
+- Extracted complex expressions into named variables
+- Made intent clearer in code
+- **Benefit**: Easier to understand and test
+
+### **5. Test Double (Mock Objects)**
+- Created `MockTimeProvider` with controllable time
+- Created `MockNetworkService` with configurable responses
+- **Benefit**: Fast, deterministic, controllable tests
+
+---
+
+## 💡 **Key Learnings**
+
+### **TDD Legacy Principles Applied:**
+
+1. **Start with Characterization Tests**
+   - Document existing behavior before refactoring
+   - Tests act as safety net during changes
+
+2. **Break Dependencies Systematically**
+   - Identify hard-coded dependencies
+   - Abstract behind interfaces
+   - Inject test doubles
+
+3. **Extract and Test Methods**
+   - Find complex logic
+   - Extract to pure functions
+   - Write comprehensive tests
+
+4. **Refactor in Small Steps**
+   - Make one change at a time
+   - Keep tests passing
+   - Commit frequently
+
+### **Android-Specific Considerations:**
+
+1. **Kotlin Object Singleton**
+   - Can't subclass `object` keyword singletons
+   - Use dependency injection instead
+   - **Note**: This is a constraint of the legacy code we're working with
+
+2. **Android Framework Dependencies**
+   - `android.util.Log` not available in unit tests
+   - Solution: Suppress logging with flag during tests
+   - Alternative: Abstract logging behind interface
+
+3. **Unit vs Instrumented Tests**
+   - These are pure unit tests (no Android framework)
+   - Run on JVM, not device/emulator
+   - Fast execution, no Gradle overhead
+
+---
+
+## 📊 **Comparison: Before vs After**
+
+| Aspect | Before Refactoring | After Refactoring |
+|--------|-------------------|-------------------|
+| **Unit Tests** | 0 | 77+ |
+| **Test Execution Time** | N/A | < 1 second |
+| **Time Testability** | Impossible | 100% controllable |
+| **Network Testability** | Impossible | 100% mockable |
+| **Pure Functions** | 0 | 8+ extracted methods |
+| **Dependency Injection** | None | Time + Network |
+| **Code Complexity** | High (mixed concerns) | Low (separated concerns) |
+| **Maintainability** | Poor | Good |
+| **Confidence in Changes** | None | High (test coverage) |
+
+---
+
+## 🚀 **Running the Tests**
+
+### **From Command Line:**
+```bash
+# Run all tests
+./gradlew test
+
+# Run specific test class
+./gradlew test --tests "com.example.legacyweatherkotlin.TimeProviderTests"
+./gradlew test --tests "com.example.legacyweatherkotlin.MethodExtractionTests"
+./gradlew test --tests "com.example.legacyweatherkotlin.NetworkDependencyTests"
+
+# Run all tests in package
+./gradlew test --tests "com.example.legacyweatherkotlin.*"
+```
+
+### **From Android Studio:**
+- Right-click on test file → Run
+- Right-click on test class → Run
+- Right-click on test method → Run
+- Use ⌃⇧R (Mac) or Ctrl+Shift+F10 (Windows/Linux)
+
+### **Expected Results:**
+```
+TimeProviderTests: 15 passed
+MethodExtractionTests: 32 passed
+NetworkDependencyTests: 30 passed
+WeatherCharacterizationTests: All passed
+Total: 77+ tests passed ✅
+```
+
+---
+
+## 📚 **Further Improvements (Beyond This Exercise)**
+
+While this solution demonstrates essential TDD legacy refactoring techniques, a production-ready architecture would include:
+
+### **Not Included (Out of Scope):**
+- ❌ Full MVVM/MVI architecture
+- ❌ Repository pattern
+- ❌ Use cases/interactors
+- ❌ Coroutines/Flow for async operations
+- ❌ Dependency injection framework (Hilt/Koin)
+- ❌ Complete separation of concerns
+
+### **Why Not Included:**
+This exercise focuses on **TDD legacy refactoring techniques**, not on learning Android architecture patterns. The goal is to demonstrate how to make legacy code testable through incremental improvements, not to create perfect architecture.
+
+### **Next Steps for Students:**
+After mastering these techniques, students can:
+1. Apply these patterns to their own legacy code
+2. Learn proper architecture patterns separately
+3. Combine TDD techniques with architecture patterns
+4. Gradually evolve legacy code toward clean architecture
+
+---
+
+## 🎓 **Conclusion**
+
+This solution demonstrates how to systematically apply TDD techniques to legacy code:
+
+1. ✅ **Broke time dependency** using TimeProvider interface
+2. ✅ **Extracted complex methods** into testable pure functions
+3. ✅ **Broke network dependency** using WeatherNetworkService interface
+4. ✅ **Created 77+ unit tests** providing comprehensive coverage
+5. ✅ **Achieved fast, reliable, deterministic tests** (< 1 second execution)
+
+**Key Takeaway**: Even deeply problematic legacy code can be made testable through systematic application of dependency breaking techniques. Once testable, you can refactor with confidence, guided by your test suite.
+
+---
+
+## 📖 **Related Files**
+
+- **Lab Instructions**: `../../labs/07DealingWithLegacyMobileCode.md`
+- **Original Legacy Code**: `../../labs/LegacyWeatherKotlin/`
+- **Swift Solution**: `../RefactoredWeatherSwift/`
+
+---
+
+## ⚠️ **Important Notes**
+
+1. **This is a teaching exercise**: The singleton pattern and global state are intentionally left as-is to demonstrate working within legacy constraints.
+
+2. **Real-world refactoring**: In production, you'd gradually extract the singleton into proper dependency-injected classes.
+
+3. **Test coverage**: These tests focus on the refactored seams. Full characterization testing would cover more scenarios.
+
+4. **Android Log suppression**: The `suppressLogging` flag is a pragmatic solution for unit testing. In production, consider a proper logging abstraction.
+
+

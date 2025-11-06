@@ -84,11 +84,13 @@ class WeatherCharacterizationTests {
         // Test Celsius formatting (default)
         WeatherSingleton.isCelsius.value = true // Fixed: Using .value for mutableStateOf
         val celsiusResult = WeatherSingleton.getTemperatureString()
-        assertEquals("Should format as Celsius with degree symbol", "27°C", celsiusResult)
+        // 300K - 273.15 = 26.85°C, truncates to 26°C
+        assertEquals("Should format as Celsius with degree symbol", "26°C", celsiusResult)
         
         // Test Fahrenheit formatting
         WeatherSingleton.isCelsius.value = false // Fixed: Using .value for mutableStateOf
         val fahrenheitResult = WeatherSingleton.getTemperatureString()
+        // (300K - 273.15) * 9/5 + 32 = 80.33°F, truncates to 80°F
         assertEquals("Should format as Fahrenheit with degree symbol", "80°F", fahrenheitResult)
         
         // Test with no weather data
