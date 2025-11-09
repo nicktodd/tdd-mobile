@@ -36,7 +36,7 @@ class WeatherSingleton: ObservableObject {
     private var cacheTimestamp: Date?
     
     // ANTI-PATTERN: Hardcoded values scattered everywhere
-    private let API_KEY = "aaef9b932f92edd04d656cdff0468dd0" // Should be in config!
+    private let API_KEY = "API_KEY_HERE" // Should be in config!
     private let BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
     private let CACHE_DURATION: TimeInterval = 300 // 5 minutes, should be configurable
     

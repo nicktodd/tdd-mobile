@@ -36,7 +36,7 @@ import java.util.*
 object WeatherSingleton {
     
     // Hard-coded API key - security nightmare!
-    private const val API_KEY = "aaef9b932f92edd04d656cdff0468dd0"
+    private const val API_KEY = "API_KEY_HERE"
     private const val BASE_URL = "https://api.openweathermap.org/data/2.5/"
     
     // Global mutable state - thread safety nightmare!
