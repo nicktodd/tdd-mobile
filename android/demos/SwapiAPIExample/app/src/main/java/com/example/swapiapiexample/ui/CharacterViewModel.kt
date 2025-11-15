@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
 class CharacterViewModel(
     private val repository: CharacterRepository
 ) : ViewModel() {
-
+    
     // Sealed class to represent different UI states
     sealed class UiState {
         object Idle : UiState()
@@ -26,10 +26,10 @@ class CharacterViewModel(
         data class Success(val characters: List<Character>) : UiState()
         data class Error(val message: String) : UiState()
     }
-
+    
     private val _uiState = MutableStateFlow<UiState>(UiState.Idle)
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
-
+    
     /**
      * Loads characters from the repository.
      * This method handles all state transitions and error cases.
@@ -37,7 +37,7 @@ class CharacterViewModel(
     fun loadCharacters(page: Int = 1) {
         viewModelScope.launch {
             _uiState.value = UiState.Loading
-
+            
             when (val result = repository.getCharacters(page)) {
                 is Result.Success -> {
                     _uiState.value = UiState.Success(result.data)
@@ -50,7 +50,7 @@ class CharacterViewModel(
             }
         }
     }
-
+    
     /**
      * Retries loading characters after an error
      */

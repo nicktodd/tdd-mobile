@@ -11,7 +11,7 @@ import com.example.swapiapiexample.data.repository.CharacterRepository
 class CharacterViewModelFactory(
     private val repository: CharacterRepository
 ) : ViewModelProvider.Factory {
-
+    
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(CharacterViewModel::class.java)) {
