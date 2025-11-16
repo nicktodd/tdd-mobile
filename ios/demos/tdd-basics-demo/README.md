@@ -36,27 +36,49 @@ This demo demonstrates the core principles of Test-Driven Development (TDD) thro
 ```
 tdd-basics-demo/
 ├── README.md
-├── Calculator.swift               # Main calculator implementation
-├── CalculatorTests.swift         # Test cases following TDD cycle
-└── Package.swift                 # Swift test dependencies
+├── Package.swift                    # Swift package configuration
+├── Sources/
+│   ├── Calculator/                  # Calculator implementation
+│   └── SpeakingClock/              # Speaking clock with dependencies
+│       ├── Clock.swift
+│       ├── SpeakingClock.swift
+│       ├── SpeechSynthesizer.swift
+│       └── TimeToTextConverter.swift
+├── Tests/
+│   ├── CalculatorTests/            # Calculator TDD examples
+│   │   └── CalculatorTests.swift
+│   └── SpeakingClockTests/         # Manual mocking examples
+│       └── SpeakingClockTests.swift
+└── cuckoo-demo/                    # Advanced mocking frameworks (optional)
+    └── README.md
 ```
 
 ## Running the Demo
 
-1. **View the failing tests first** (Red phase)
-   ```bash
-   swift test --filter RedPhase
-   ```
+### Option 1: Using Xcode (Recommended)
 
-2. **See minimal implementation** (Green phase)
+1. **Open the package in Xcode**:
    ```bash
-   swift test --filter GreenPhase
+   open Package.swift
    ```
+   Or double-click `Package.swift` in Finder.
 
-3. **Examine refactored code** (Refactor phase)
-   ```bash
-   swift test
-   ```
+2. **Run all tests**:
+   - Press `Cmd+U` to run all tests
+   - Or click the diamond icons next to test methods to run individually
+
+3. **View test results**:
+   - Test Navigator (Cmd+6) shows all tests
+   - Results are displayed inline in the editor
+
+### Option 2: Using VS Code with Swift Extension
+
+If you have the Swift extension installed in VS Code, tests will appear in the Test Explorer and can be run directly from the editor.
+
+### What You'll See
+
+- **CalculatorTests.swift** - Demonstrates Red-Green-Refactor cycle
+- **SpeakingClockTests.swift** - Shows manual mock implementations for testing with dependencies
 
 ## Key Learning Points
 
@@ -71,9 +93,34 @@ tdd-basics-demo/
 
 ### Scaling TDD
 - Modular design for testability
-- Mock objects for external dependencies
-- Parallel test execution
+- Mock objects for external dependencies (see `SpeakingClockTests.swift`)
+- Dependency injection patterns
 - Code coverage analysis
+
+## Manual Mocking Example
+
+The `SpeakingClockTests.swift` file demonstrates how to create manual mocks without external frameworks:
+
+```swift
+// Manual mock with call tracking
+class ClockMock: Clock {
+    var stubbedTime: Date = Date()
+    private(set) var getTimeCallCount = 0
+
+    override func getTime() -> Date {
+        getTimeCallCount += 1
+        return stubbedTime
+    }
+}
+```
+
+**Benefits of manual mocks:**
+- No external dependencies
+- Full control over behavior
+- Easy to understand and debug
+- Works with any Swift project
+
+**See `cuckoo-demo/` for examples using advanced mocking frameworks (Cuckoo, Nimble).**
 
 ## Next Steps
 - Try modifying the calculator to add new operations

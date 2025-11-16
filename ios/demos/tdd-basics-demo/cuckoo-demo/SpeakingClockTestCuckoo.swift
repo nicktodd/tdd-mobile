@@ -1,6 +1,6 @@
 import XCTest
 import Cuckoo
-@testable import tdd_basics_demo
+@testable import SpeakingClock
 
 final class SpeakingClockTestCuckoo: XCTestCase {
     func testSayTimeWithCuckoo() {

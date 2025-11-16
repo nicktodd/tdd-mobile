@@ -14,16 +14,21 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/Brightify/Cuckoo.git", from: "1.6.0")
+        // No external dependencies needed for manual mocking examples
     ],
     targets: [
         .target(
             name: "Calculator",
             dependencies: []
         ),
+        .target(name: "SpeakingClock", dependencies: []),
         .testTarget(
             name: "CalculatorTests",
-            dependencies: ["Calculator", "Cuckoo"]
+            dependencies: ["Calculator"]
         ),
+        .testTarget(
+            name: "SpeakingClockTests",
+            dependencies: ["SpeakingClock"]
+            )
     ]
 )

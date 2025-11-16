@@ -1,5 +1,5 @@
 import XCTest
-@testable import tdd_basics_demo
+@testable import SpeakingClock
 
 final class SpeakingClockTests: XCTestCase {
     func testSayTime() {
