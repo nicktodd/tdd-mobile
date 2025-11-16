@@ -1,10 +1,9 @@
 import XCTest
 import Cuckoo
-import Nimble
 @testable import tdd_basics_demo
 
-final class SpeakingClockTestCuckooNimble: XCTestCase {
-    func testSayTimeWithCuckooAndNimble() {
+final class SpeakingClockTestCuckoo: XCTestCase {
+    func testSayTimeWithCuckoo() {
         // Arrange
         let mockClock = MockClock()
         let mockSpeechSynthesizer = MockSpeechSynthesizer()
@@ -27,8 +26,8 @@ final class SpeakingClockTestCuckooNimble: XCTestCase {
         speakingClock.sayTime()
 
         // Assert
-        expect(mockClock).to(haveReceived("getTime"))
-        expect(mockConverter).to(haveReceived("convertTimeToText").with(testDate))
-        expect(mockSpeechSynthesizer).to(haveReceived("speak").with(testText))
+        verify(mockClock).getTime()
+        verify(mockConverter).convertTimeToText(testDate)
+        verify(mockSpeechSynthesizer).speak(testText)
     }
 }
