@@ -28,12 +28,7 @@ replay_pid*
 .kotlin/
 
 # Xcode specific files and folders
-*.xcuserstate
-*.xcworkspace
-*.xcodeproj
-*.xcuserdata
-*.xccheckout
-*.moved-aside
+
 DerivedData/
 build/
 *.pbxuser
